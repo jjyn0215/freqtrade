@@ -62,6 +62,7 @@ class UpbitWSClient:
         self._running = False
         self._recv_task: asyncio.Task | None = None
         self._reconnect_delay = 1.0  # seconds, doubles on consecutive failures
+        self._connected = asyncio.Event()
 
     @property
     def is_running(self) -> bool:
@@ -77,6 +78,7 @@ class UpbitWSClient:
         if self._running:
             return
         self._running = True
+        self._connected.clear()
         self._session = aiohttp.ClientSession()
         await self._open_ws()
         self._recv_task = asyncio.create_task(self._recv_loop())
@@ -84,6 +86,7 @@ class UpbitWSClient:
     async def close(self) -> None:
         """Gracefully shut down the WS connection."""
         self._running = False
+        self._connected.clear()
         if self._recv_task and not self._recv_task.done():
             self._recv_task.cancel()
             try:
@@ -116,7 +119,8 @@ class UpbitWSClient:
             return  # already subscribed
 
         self._subscriptions[key].add(code)
-        await self._send_subscribe()
+        if await self._wait_until_connected():
+            await self._send_subscribe()
 
     async def unsubscribe(self, pair: str, timeframe: str) -> None:
         """Remove a subscription (best effort – Upbit WS doesn't support
@@ -130,7 +134,7 @@ class UpbitWSClient:
         if not codes:
             self._subscriptions.pop(upbit_type, None)
         # Re-send full subscription (or close & re-open if nothing left)
-        if self._subscriptions:
+        if self._subscriptions and await self._wait_until_connected():
             await self._send_subscribe()
 
     def clear_cache(self) -> None:
@@ -153,6 +157,7 @@ class UpbitWSClient:
             )
             logger.info("Upbit WS connected.")
             self._reconnect_delay = 1.0
+            self._connected.set()
             # Re-send active subscriptions after (re-)connect
             if self._subscriptions:
                 await self._send_subscribe()
@@ -235,6 +240,7 @@ class UpbitWSClient:
         if not self._running:
             return
         logger.info(f"Upbit WS reconnecting in {self._reconnect_delay:.1f}s ...")
+        self._connected.clear()
         try:
             if self._ws and not self._ws.closed:
                 await self._ws.close()
@@ -246,6 +252,19 @@ class UpbitWSClient:
             await self._open_ws()
         except Exception:
             logger.exception("Upbit WS reconnect failed")
+
+    async def _wait_until_connected(self) -> bool:
+        """Wait for a usable connection before sending subscriptions."""
+        if self._ws and not self._ws.closed:
+            return True
+        if not self._running:
+            return False
+        try:
+            await asyncio.wait_for(self._connected.wait(), timeout=10.0)
+            return True
+        except TimeoutError:
+            logger.warning("Upbit WS connect timeout - subscription skipped")
+            return False
 
     # ------------------------------------------------------------------
     # Message parsing
