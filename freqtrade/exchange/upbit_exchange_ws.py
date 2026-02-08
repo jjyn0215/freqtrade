@@ -102,7 +102,7 @@ class UpbitExchangeWS(ExchangeWS):
                 await self._upbit_ws.connect()
 
             await self._upbit_ws.subscribe(pair, timeframe)
-            logger.info(f"Upbit WS subscribed: {pair}, {timeframe}")
+            logger.debug("Upbit WS subscribe scheduled: %s, %s", pair, timeframe)
 
             while (pair, timeframe, candle_type) in self._klines_watching:
                 # Poll the cache – candles are updated asynchronously by _recv_loop

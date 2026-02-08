@@ -10,6 +10,7 @@ Reference: https://docs.upbit.com/reference/websocket-candle
 """
 
 import asyncio
+import gzip
 import json
 import logging
 import uuid
@@ -191,8 +192,11 @@ class UpbitWSClient:
                 })
         payload.append({"format": "DEFAULT"})
 
+        total_codes = sum(len(codes) for codes in self._subscriptions.values())
+        types_list = ",".join(sorted(self._subscriptions.keys()))
+        logger.info("Upbit WS subscribe sent: %s codes (%s)", total_codes, types_list)
         msg = json.dumps(payload)
-        logger.debug(f"Upbit WS subscribe: {msg}")
+        logger.debug("Upbit WS subscribe payload: %s", msg)
         await self._ws.send_str(msg)
 
     async def _recv_loop(self) -> None:
@@ -210,8 +214,13 @@ class UpbitWSClient:
                 if msg.type == aiohttp.WSMsgType.TEXT:
                     self._handle_message(msg.data)
                 elif msg.type == aiohttp.WSMsgType.BINARY:
-                    # Upbit may send binary (gzip) – decode as utf-8 text
-                    self._handle_message(msg.data.decode("utf-8", errors="replace"))
+                    # Upbit sends gzip-compressed binary frames by default
+                    try:
+                        decoded = gzip.decompress(msg.data).decode("utf-8", errors="replace")
+                    except (OSError, EOFError):
+                        # Fall back to a direct decode if payload is not gzip
+                        decoded = msg.data.decode("utf-8", errors="replace")
+                    self._handle_message(decoded)
                 elif msg.type in (
                     aiohttp.WSMsgType.CLOSED,
                     aiohttp.WSMsgType.CLOSING,
