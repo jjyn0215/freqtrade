@@ -287,7 +287,7 @@ class Exchange:
         ):
             self._ws_async = self._init_ccxt(exchange_conf, False, ccxt_async_config)
             # Use native Upbit WS adapter when exchange is upbit
-            if self.name == "upbit":
+            if exchange_conf.get("name", "").lower() == "upbit" or self.id == "upbit":
                 self._exchange_ws = UpbitExchangeWS(self._config, self._ws_async)
             else:
                 self._exchange_ws = ExchangeWS(self._config, self._ws_async)
