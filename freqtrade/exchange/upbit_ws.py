@@ -63,6 +63,8 @@ class UpbitWSClient:
         self._recv_task: asyncio.Task | None = None
         self._reconnect_delay = 1.0  # seconds, doubles on consecutive failures
         self._connected = asyncio.Event()
+        self._subscribe_task: asyncio.Task | None = None
+        self._subscribe_delay = 0.2
 
     @property
     def is_running(self) -> bool:
@@ -119,8 +121,7 @@ class UpbitWSClient:
             return  # already subscribed
 
         self._subscriptions[key].add(code)
-        if await self._wait_until_connected():
-            await self._send_subscribe()
+        self._schedule_subscribe_send()
 
     async def unsubscribe(self, pair: str, timeframe: str) -> None:
         """Remove a subscription (best effort – Upbit WS doesn't support
@@ -134,8 +135,8 @@ class UpbitWSClient:
         if not codes:
             self._subscriptions.pop(upbit_type, None)
         # Re-send full subscription (or close & re-open if nothing left)
-        if self._subscriptions and await self._wait_until_connected():
-            await self._send_subscribe()
+        if self._subscriptions:
+            self._schedule_subscribe_send()
 
     def clear_cache(self) -> None:
         """Clear all cached OHLCV data."""
@@ -252,6 +253,24 @@ class UpbitWSClient:
             await self._open_ws()
         except Exception:
             logger.exception("Upbit WS reconnect failed")
+
+    def _schedule_subscribe_send(self) -> None:
+        """Schedule a debounced subscription update to avoid spamming the server."""
+        if self._subscribe_task and not self._subscribe_task.done():
+            return
+        if not self._running:
+            return
+        self._subscribe_task = asyncio.create_task(self._delayed_send_subscribe())
+
+    async def _delayed_send_subscribe(self) -> None:
+        try:
+            await asyncio.sleep(self._subscribe_delay)
+            if self._subscriptions and await self._wait_until_connected():
+                await self._send_subscribe()
+        except asyncio.CancelledError:
+            pass
+        finally:
+            self._subscribe_task = None
 
     async def _wait_until_connected(self) -> bool:
         """Wait for a usable connection before sending subscriptions."""

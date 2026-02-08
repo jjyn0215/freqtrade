@@ -358,6 +358,7 @@ class TestUpbitWSClientSubscribe:
         client._running = True
 
         await client.subscribe("BTC/KRW", "1m")
+        await asyncio.sleep(0.3)
 
         assert "candle.1m" in client._subscriptions
         assert "KRW-BTC" in client._subscriptions["candle.1m"]
