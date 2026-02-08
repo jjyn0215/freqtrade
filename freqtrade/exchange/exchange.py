@@ -100,6 +100,7 @@ from freqtrade.exchange.exchange_utils_timeframe import (
     timeframe_to_seconds,
 )
 from freqtrade.exchange.exchange_ws import ExchangeWS
+from freqtrade.exchange.upbit_exchange_ws import UpbitExchangeWS
 from freqtrade.misc import (
     chunks,
     deep_merge_dicts,
@@ -285,7 +286,11 @@ class Exchange:
             and _has_watch_ohlcv
         ):
             self._ws_async = self._init_ccxt(exchange_conf, False, ccxt_async_config)
-            self._exchange_ws = ExchangeWS(self._config, self._ws_async)
+            # Use native Upbit WS adapter when exchange is upbit
+            if self.name == "upbit":
+                self._exchange_ws = UpbitExchangeWS(self._config, self._ws_async)
+            else:
+                self._exchange_ws = ExchangeWS(self._config, self._ws_async)
 
         logger.info(f'Using Exchange "{self.name}"')
         self.required_candle_call_count = 1

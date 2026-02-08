@@ -552,6 +552,25 @@ EXCHANGES: dict[str, TestExchangeOnlineSetup] = {
         # TODO: re-enable hyperliquid websocket tests
         "skip_ws_tests": True,
     },
+    "upbit": {
+        "pair": "BTC/KRW",
+        "stake_currency": "KRW",
+        "use_ci_proxy": False,
+        "hasQuoteVolume": True,
+        "timeframe": "1m",
+        "candle_count": 200,
+        "futures": False,
+        "futures_pair": None,
+        "candle_count_futures": None,
+        "hasQuoteVolumeFutures": None,
+        "leverage_tiers_public": False,
+        "leverage_in_spot_market": False,
+        "trades_lookback_hours": 4,
+        "private_methods": None,
+        "sample_order": None,
+        "sample_my_trades": None,
+        "skip_ws_tests": False,
+    },
 }
 
 EXCHANGES_FUTURES = [exch for exch, params in EXCHANGES.items() if params.get("futures")]

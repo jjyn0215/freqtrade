@@ -65,6 +65,7 @@ SUPPORTED_EXCHANGES = [
     "kraken",
     "okx",
     "myokx",
+    "upbit",
 ]
 
 # either the main, or replacement methods (array) is required
